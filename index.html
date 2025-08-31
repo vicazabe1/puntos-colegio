@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Puntos para Grupos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4e6;
+        }
+        .selected-group {
+            border: 2px solid #3b82f6;
+            background-color: #ebf5ff;
+            box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2);
+            transform: scale(1.01);
+        }
+        .sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+        .sort-icon {
+            display: inline-block;
+            width: 0.8rem;
+            text-align: center;
+        }
+        .transaction-log::-webkit-scrollbar {
+            width: 8px;
+        }
+        .transaction-log::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 4px;
+        }
+        /* Style for the login page to center it */
+        .page-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center py-10 px-4">
+
+    <!-- Login Page (Initially visible) -->
+    <div id="loginPage" class="bg-white shadow-xl rounded-2xl p-8 max-w-lg w-full text-center">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4">Bienvenido al Sistema de Puntos</h1>
+        <p class="text-gray-600 mb-6">Por favor, ingresa tu nombre para continuar.</p>
+        <div class="space-y-4">
+            <input type="text" id="userNameInput" placeholder="Tu Nombre" class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
+            <button id="loginBtn" class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-bold hover:bg-blue-700 transition duration-300 transform hover:scale-105 active:scale-95">Entrar</button>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="mainApp" class="bg-white shadow-xl rounded-2xl p-8 max-w-5xl w-full hidden">
+        <h1 class="text-4xl font-bold text-center mb-2 text-gray-800">Sistema de Puntos</h1>
+        <p class="text-center text-gray-500 mb-6">Para los grupos fijos del colegio</p>
+
+        <!-- User Name display -->
+        <div class="mb-6 bg-blue-100 text-blue-800 p-3 rounded-xl shadow-inner">
+            <p class="text-sm font-medium">Nombre de Usuario: <span id="userNameDisplay" class="font-mono break-all text-xs text-blue-600">Cargando...</span></p>
+        </div>
+
+        <!-- Groups List - Page 1 -->
+        <div id="groupsPage" class="hidden">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-700">1. Selecciona un grupo</h2>
+            
+            <!-- Ranking Table Header -->
+            <div class="overflow-x-auto pb-4">
+                <div id="rankingHeader" class="grid grid-cols-[1.5fr_0.5fr_repeat(15,_0.5fr)] gap-2 text-xs font-semibold text-gray-600 mb-2 px-2 py-2 border-b-2 border-gray-300 min-w-max">
+                    <span class="sortable" data-sort-key="name" data-sort-dir="asc">Grupo<span class="sort-icon"></span></span>
+                    <span class="sortable text-center" data-sort-key="score" data-sort-dir="desc">Puntos<span class="sort-icon"></span></span>
+                    <!-- Criterion headers will be injected by JavaScript -->
+                </div>
+                <div id="groupsList" class="space-y-2">
+                    <p class="text-center text-gray-400">Cargando grupos...</p>
+                </div>
+            </div>
+            
+            <!-- Abbreviation Key -->
+            <div class="mt-8">
+                <h3 class="text-xl font-semibold mb-2 text-gray-700 text-center">Convención de Puntos</h3>
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-inner grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm" id="abbreviationKeyContainer">
+                    <!-- Abbreviation keys will be injected here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Criterion Panel - Page 2 (Initially Hidden) -->
+        <div id="criterionPage" class="hidden">
+            <div class="text-center mb-4">
+                <h2 class="text-2xl font-semibold mb-1 text-gray-700">Grupo: <span id="selectedGroupName" class="font-bold text-blue-600"></span></h2>
+                <p class="text-4xl font-extrabold text-blue-600">Puntos: <span id="currentScore"></span></p>
+            </div>
+            <h3 class="text-xl font-semibold mb-4 text-gray-700 text-center">Aplica puntos</h3>
+            <div id="criterionsList" class="flex flex-wrap justify-center gap-4">
+                <!-- Criterion buttons will be injected here -->
+            </div>
+            <div class="mt-6 text-center">
+                <button id="goHomeBtn" class="bg-gray-300 text-gray-800 py-2 px-6 rounded-lg font-medium hover:bg-gray-400 transition duration-300 transform hover:scale-105 active:scale-95">Ir a Inicio</button>
+            </div>
+            
+            <!-- Transaction History Log -->
+            <div class="mt-8">
+                <h3 class="text-xl font-semibold mb-2 text-gray-700 text-center">Historial de Cambios</h3>
+                <div id="transactionHistory" class="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-inner max-h-64 overflow-y-auto transaction-log">
+                    <p class="text-center text-gray-400">Sin cambios registrados para este grupo.</p>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- Message Box (Modal) -->
+    <div id="messageBox" class="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-lg p-6 max-w-sm w-full shadow-lg text-center">
+            <h3 id="messageBoxTitle" class="text-xl font-bold mb-2"></h3>
+            <p id="messageBoxMessage" class="text-gray-700 mb-4"></p>
+            <button id="messageBoxCloseBtn" class="bg-blue-600 text-white py-2 px-6 rounded-md font-medium hover:bg-blue-700 transition duration-300">Aceptar</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, updateDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // IMPORTANT: Use the provided global variables
+        const firebaseConfig = {
+        apiKey: "AIzaSyBqd2a4UCNxeSUa8Xr7EEBO-_ezMAFflLM",
+        authDomain: "sistema-puntos-colegio.firebaseapp.com",
+        projectId: "sistema-puntos-colegio",
+        storageBucket: "sistema-puntos-colegio.firebasestorage.app",
+        messagingSenderId: "420365280481",
+        appId: "1:420365280481:web:056ab9385d89b1229503a0"
+        };
+
+        // Fixed list of groups
+        const fixedGroups = [
+            '1°', '2°', '3°', '4°', '5°',
+            '6°-3', '6°-4', '7°-3', '8°-3', '9°-3',
+            '10°-1', '10°-2', '11°-1', '11°-2'
+        ];
+
+        // Fixed list of criterions from the provided image
+        const criterions = [
+            { id: 'comportamiento-grupal-plus', name: 'Comportamiento grupal (+50)', abbr: 'CG+', points: 50, color: 'bg-green-500' },
+            { id: 'comportamiento-grupal-minus', name: 'Comportamiento grupal (-50)', abbr: 'CG-', points: -50, color: 'bg-red-500' },
+            { id: 'uniforme-ind-plus', name: 'Llevar el uniforme (+10)', abbr: 'U+', points: 10, color: 'bg-green-500' },
+            { id: 'uniforme-ind-minus', name: 'Llevar el uniforme (-10)', abbr: 'U-', points: -10, color: 'bg-red-500' },
+            { id: 'llegadas-tarde-ind', name: 'Llegadas Tarde (-10)', abbr: 'LT-', points: -10, color: 'bg-red-500' },
+            { id: 'todos-puntuales', name: 'Todos Puntuales (+50)', abbr: 'TP+', points: 50, color: 'bg-green-500' },
+            { id: 'usar-vaper', name: 'Usar Vaper (-100)', abbr: 'V-', points: -100, color: 'bg-red-700' },
+            { id: 'peleas', name: 'Peleas (-100)', abbr: 'P-', points: -100, color: 'bg-red-700' },
+            { id: 'no-tareas-ind', name: 'No tareas (-5)', abbr: 'NT-', points: -5, color: 'bg-red-500' },
+            { id: 'todos-tareas', name: 'Todos Tareas (+50)', abbr: 'TT+', points: 50, color: 'bg-green-500' },
+            { id: 'llamados-atencion', name: 'Llamados de atención (-50)', abbr: 'LA-', points: -50, color: 'bg-red-500' },
+            { id: 'aseo-salon', name: 'Aseo del salon (-15)', abbr: 'AS-', points: -15, color: 'bg-red-500' },
+            { id: 'participacion-grupal', name: 'Participacion Grupal (+50)', abbr: 'PG+', points: 50, color: 'bg-green-500' },
+            { id: 'botellas-desc-ind', name: 'Jugar Botellas (-10)', abbr: 'B-', points: -10, color: 'bg-red-500' },
+            { id: 'uso-inadecuado-cel-ind', name: 'Uso inadecuado cel (-5)', abbr: 'UC-', points: -5, color: 'bg-red-500' }
+        ];
+
+        // UI Elements
+        const loginPage = document.getElementById('loginPage');
+        const mainApp = document.getElementById('mainApp');
+        const groupsPage = document.getElementById('groupsPage');
+        const criterionPage = document.getElementById('criterionPage');
+        const groupsList = document.getElementById('groupsList');
+        const criterionsList = document.getElementById('criterionsList');
+        const userNameDisplay = document.getElementById('userNameDisplay');
+        const userNameInput = document.getElementById('userNameInput');
+        const loginBtn = document.getElementById('loginBtn');
+        const messageBox = document.getElementById('messageBox');
+        const messageBoxTitle = document.getElementById('messageBoxTitle');
+        const messageBoxMessage = document.getElementById('messageBoxMessage');
+        const messageBoxCloseBtn = document.getElementById('messageBoxCloseBtn');
+        const selectedGroupNameSpan = document.getElementById('selectedGroupName');
+        const currentScoreSpan = document.getElementById('currentScore');
+        const goHomeBtn = document.getElementById('goHomeBtn');
+        const rankingHeader = document.getElementById('rankingHeader');
+        const transactionHistory = document.getElementById('transactionHistory');
+        const abbreviationKeyContainer = document.getElementById('abbreviationKeyContainer');
+
+        // State variables
+        let db, auth;
+        let unsubscribeGroups, unsubscribeTransactions;
+        let currentUserId = null;
+        let currentUserName = null; // New state variable for the user's name
+        let selectedGroupId = null;
+        let groupsData = [];
+        let sortKey = 'score';
+        let sortDirection = 'desc';
+
+        // Function to show custom message box
+        const showMessage = (title, message) => {
+            messageBoxTitle.textContent = title;
+            messageBoxMessage.textContent = message;
+            messageBox.classList.remove('hidden');
+            messageBox.classList.add('flex');
+        };
+
+        messageBoxCloseBtn.addEventListener('click', () => {
+            messageBox.classList.remove('flex');
+            messageBox.classList.add('hidden');
+        });
+
+        // Function to handle page navigation
+        const navigateToGroupsPage = () => {
+            if (unsubscribeTransactions) {
+                unsubscribeTransactions();
+            }
+            groupsPage.classList.remove('hidden');
+            criterionPage.classList.add('hidden');
+            selectedGroupId = null;
+        };
+        
+        const navigateToCriterionPage = (groupName, score) => {
+            groupsPage.classList.add('hidden');
+            criterionPage.classList.remove('hidden');
+            selectedGroupNameSpan.textContent = groupName;
+            currentScoreSpan.textContent = score;
+            startTransactionListener(selectedGroupId);
+        };
+        
+        goHomeBtn.addEventListener('click', navigateToGroupsPage);
+
+        // Initialize Firebase on window load
+        window.onload = async function() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('Debug');
+
+                // Sign in the user anonymously to get a UID
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                // Auth state listener to set the user ID
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        currentUserId = user.uid;
+                    } else {
+                        currentUserId = crypto.randomUUID();
+                    }
+                    // Show login page
+                    loginPage.classList.remove('hidden');
+                    mainApp.classList.add('hidden');
+                });
+
+            } catch (e) {
+                console.error("Error during Firebase initialization or authentication:", e);
+                showMessage("Error de Inicialización", "No se pudo conectar a la base de datos. Por favor, intente de nuevo más tarde.");
+            }
+        };
+
+        // Handle login button click
+        loginBtn.addEventListener('click', () => {
+            const userName = userNameInput.value.trim();
+            if (userName) {
+                currentUserName = userName;
+                userNameDisplay.textContent = currentUserName;
+                loginPage.classList.add('hidden');
+                mainApp.classList.remove('hidden');
+                groupsPage.classList.remove('hidden');
+                // Initialize the rest of the app after successful login
+                initializeGroups();
+                createCriterionButtons();
+                renderAbbreviationKey();
+                renderRankingHeader();
+                startGroupListener();
+            } else {
+                showMessage("Nombre Requerido", "Por favor, ingresa tu nombre para continuar.");
+            }
+        });
+
+        // Function to initialize fixed groups in Firestore
+        const initializeGroups = async () => {
+            try {
+                const groupsColRef = collection(db, `artifacts/${appId}/public/data/groups`);
+                for (const groupName of fixedGroups) {
+                    const q = query(groupsColRef, where("name", "==", groupName));
+                    const querySnapshot = await getDocs(q);
+                    if (querySnapshot.empty) {
+                        const initialGainsLosses = {};
+                        criterions.forEach(criterion => {
+                            initialGainsLosses[criterion.id] = 0;
+                        });
+                        await addDoc(groupsColRef, {
+                            name: groupName,
+                            score: 1000,
+                            gainsAndLosses: initialGainsLosses,
+                            createdAt: serverTimestamp()
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error("Error al inicializar grupos fijos:", e);
+            }
+        };
+
+        // Function to start the Firestore listener for groups
+        const startGroupListener = () => {
+            if (unsubscribeGroups) {
+                unsubscribeGroups();
+            }
+            const groupsColRef = collection(db, `artifacts/${appId}/public/data/groups`);
+            unsubscribeGroups = onSnapshot(groupsColRef, (querySnapshot) => {
+                groupsData = [];
+                querySnapshot.forEach((doc) => {
+                    groupsData.push({ id: doc.id, ...doc.data() });
+                });
+                renderGroups();
+            }, (error) => {
+                console.error("Error al escuchar cambios en la base de datos:", error);
+                showMessage("Error de Conexión", "No se pudieron cargar los datos. Por favor, verifique su conexión a internet.");
+            });
+        };
+
+        // Function to start the Firestore listener for transactions
+        const startTransactionListener = (groupId) => {
+            if (unsubscribeTransactions) {
+                unsubscribeTransactions();
+            }
+            const transactionsColRef = collection(db, `artifacts/${appId}/public/data/groups/${groupId}/transactions`);
+            unsubscribeTransactions = onSnapshot(transactionsColRef, (querySnapshot) => {
+                const transactions = [];
+                querySnapshot.forEach((doc) => {
+                    transactions.push({ id: doc.id, ...doc.data() });
+                });
+
+                // Sort transactions by timestamp in descending order
+                transactions.sort((a, b) => b.timestamp - a.timestamp);
+
+                transactionHistory.innerHTML = '';
+                if (transactions.length === 0) {
+                    transactionHistory.innerHTML = '<p class="text-center text-gray-400">Sin cambios registrados para este grupo.</p>';
+                } else {
+                    transactions.forEach(tx => {
+                        const txDate = tx.timestamp?.toDate().toLocaleString() || 'Fecha desconocida';
+                        const criterion = criterions.find(c => c.id === tx.criterionId);
+                        const points = tx.points > 0 ? `+${tx.points}` : tx.points;
+                        const userIdentifier = tx.userName || tx.userId; // Use the name if available, otherwise fall back to the ID
+                        const item = document.createElement('div');
+                        item.className = 'border-b border-gray-200 py-2 last:border-b-0';
+                        item.innerHTML = `
+                            <p class="text-sm text-gray-800">
+                                <span class="font-bold text-gray-600">${txDate}</span>
+                                <br>
+                                <span class="text-xs font-mono text-gray-500 break-all">Usuario: ${userIdentifier}</span>
+                                <br>
+                                <span class="font-medium ${points > 0 ? 'text-green-600' : 'text-red-600'}">${criterion.name} (${points})</span>
+                            </p>
+                        `;
+                        transactionHistory.appendChild(item);
+                    });
+                }
+            }, (error) => {
+                console.error("Error al escuchar transacciones:", error);
+            });
+        };
+
+        // Function to render the dynamic ranking header
+        const renderRankingHeader = () => {
+            const staticHeaders = `
+                <span class="sortable" data-sort-key="name" data-sort-dir="asc">Grupo<span class="sort-icon"></span></span>
+                <span class="sortable text-center" data-sort-key="score" data-sort-dir="desc">Puntos<span class="sort-icon"></span></span>
+            `;
+            const criterionHeaders = criterions.map(c => `
+                <span class="sortable text-center" data-sort-key="${c.id}" data-sort-dir="${c.points > 0 ? 'desc' : 'asc'}">${c.abbr}<span class="sort-icon"></span></span>
+            `).join('');
+            rankingHeader.innerHTML = staticHeaders + criterionHeaders;
+        };
+
+        // Function to sort and render groups
+        const renderGroups = () => {
+            groupsData.sort((a, b) => {
+                let aValue, bValue;
+                if (sortKey === 'score' || sortKey === 'name') {
+                    aValue = a[sortKey];
+                    bValue = b[sortKey];
+                    if (sortKey === 'name') {
+                         aValue = aValue.toLowerCase();
+                         bValue = bValue.toLowerCase();
+                    }
+                } else {
+                    aValue = a.gainsAndLosses[sortKey] || 0;
+                    bValue = b.gainsAndLosses[sortKey] || 0;
+                }
+                
+                if (aValue < bValue) {
+                    return sortDirection === 'asc' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortDirection === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+
+            groupsList.innerHTML = '';
+            if (groupsData.length === 0) {
+                groupsList.innerHTML = '<p class="text-center text-gray-400">No hay grupos añadidos aún.</p>';
+            } else {
+                groupsData.forEach((group) => {
+                    createGroupElement(group.id, group);
+                });
+            }
+
+            document.querySelectorAll('.sort-icon').forEach(icon => icon.textContent = '');
+            const currentSortHeader = document.querySelector(`[data-sort-key="${sortKey}"] .sort-icon`);
+            if (currentSortHeader) {
+                currentSortHeader.textContent = sortDirection === 'asc' ? ' ▲' : ' ▼';
+            }
+        };
+
+        // Add sorting functionality to headers
+        rankingHeader.addEventListener('click', (e) => {
+            const header = e.target.closest('.sortable');
+            if (header) {
+                const newSortKey = header.dataset.sortKey;
+                
+                if (newSortKey === sortKey) {
+                    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                } else {
+                    sortKey = newSortKey;
+                    sortDirection = header.dataset.sortDir || 'desc';
+                }
+                renderGroups();
+            }
+        });
+
+        // Function to create criterion buttons
+        const createCriterionButtons = () => {
+            criterionsList.innerHTML = ''; // Clear previous buttons
+            criterions.forEach(criterion => {
+                const button = document.createElement('button');
+                button.className = `criterion-btn ${criterion.color} text-white p-3 rounded-xl font-medium shadow-md hover:shadow-lg transition transform hover:scale-105 active:scale-95`;
+                button.textContent = `${criterion.name}`;
+                button.addEventListener('click', () => {
+                    if (selectedGroupId) {
+                        updateScore(selectedGroupId, criterion.points, criterion.id);
+                    } else {
+                        showMessage("Error", "Por favor, primero selecciona un grupo.");
+                    }
+                });
+                criterionsList.appendChild(button);
+            });
+        };
+        
+        // Function to render the abbreviation key
+        const renderAbbreviationKey = () => {
+            const keyContainer = document.getElementById('abbreviationKeyContainer');
+            keyContainer.innerHTML = '';
+            criterions.forEach(criterion => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center space-x-2';
+                const abbrSpan = document.createElement('span');
+                abbrSpan.className = 'font-bold text-gray-900 w-12 text-right';
+                abbrSpan.textContent = criterion.abbr;
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'text-gray-800';
+                nameSpan.textContent = criterion.name;
+                item.appendChild(abbrSpan);
+                item.appendChild(nameSpan);
+                keyContainer.appendChild(item);
+            });
+        };
+
+        // Function to create a group element in the UI
+        const createGroupElement = (docId, groupData) => {
+            const groupItem = document.createElement('div');
+            groupItem.className = 'group-item grid grid-cols-[1.5fr_0.5fr_repeat(15,_0.5fr)] items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer min-w-max';
+            groupItem.setAttribute('data-id', docId);
+
+            const groupNameDiv = document.createElement('div');
+            groupNameDiv.className = 'text-lg font-bold text-gray-800';
+            groupNameDiv.textContent = groupData.name;
+            groupItem.appendChild(groupNameDiv);
+
+            const scoreDiv = document.createElement('div');
+            scoreDiv.className = 'text-xl font-extrabold text-blue-600 text-center';
+            scoreDiv.textContent = groupData.score;
+            groupItem.appendChild(scoreDiv);
+
+            criterions.forEach(criterion => {
+                const criterionScoreDiv = document.createElement('div');
+                const points = groupData.gainsAndLosses[criterion.id] || 0;
+                const formattedPoints = points > 0 ? `+${points}` : points;
+                criterionScoreDiv.className = `font-medium text-xs text-center ${points > 0 ? 'text-green-600' : 'text-red-600'}`;
+                criterionScoreDiv.textContent = formattedPoints;
+                groupItem.appendChild(criterionScoreDiv);
+            });
+            
+            groupItem.addEventListener('click', () => {
+                const allGroups = document.querySelectorAll('.group-item');
+                allGroups.forEach(el => el.classList.remove('selected-group'));
+                groupItem.classList.add('selected-group');
+                selectedGroupId = docId;
+                navigateToCriterionPage(groupData.name, groupData.score);
+            });
+            groupsList.appendChild(groupItem);
+        };
+
+        // Function to update a group's score and create a transaction log
+        const updateScore = async (docId, points, criterionId) => {
+            try {
+                const groupRef = doc(db, `artifacts/${appId}/public/data/groups`, docId);
+                const transactionsColRef = collection(db, `artifacts/${appId}/public/data/groups/${docId}/transactions`);
+
+                // Update the score on the UI first for instant feedback
+                const currentScore = parseInt(currentScoreSpan.textContent);
+                currentScoreSpan.textContent = currentScore + points;
+
+                // Update Firestore
+                await updateDoc(groupRef, {
+                    score: increment(points),
+                    [`gainsAndLosses.${criterionId}`]: increment(points)
+                });
+
+                await addDoc(transactionsColRef, {
+                    points: points,
+                    criterionId: criterionId,
+                    userId: currentUserId,
+                    userName: currentUserName, // Save the new user name
+                    timestamp: serverTimestamp()
+                });
+
+            } catch (e) {
+                console.error("Error al actualizar puntos o registrar transacción:", e);
+                showMessage("Error de Actualización", "No se pudieron actualizar los puntos. Intente de nuevo.");
+            }
+        };
+    </script>
+</body>
+</html>
